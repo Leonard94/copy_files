@@ -7,11 +7,9 @@ import os  # Добавлен для обработки ошибок досту�
 
 # --- Константы для путей ---
 # Папка, откуда копируем файлы (используйте необработанные строки r'' или двойные слеши \\ для Windows)
-# Пример для Windows: SOURCE_DIRECTORY = Path(r'C:\Users\YourUser\Projects\source')
-SOURCE_DIRECTORY = Path('./antilopa')
+SOURCE_DIRECTORY = Path('./backend')
 # Папка, куда копируем файлы
-# Пример для Windows: DESTINATION_DIRECTORY = Path(r'C:\Temp\output_code')
-DESTINATION_DIRECTORY = Path('./delete')
+DESTINATION_DIRECTORY = Path('./delete_backend')
 # -------------------------
 
 # --- Конфигурация ---
@@ -23,11 +21,15 @@ CONFIG = {
     # Паттерны в ИМЕНАХ файлов, которые нужно игнорировать (даже если расширение подходит)
     'EXCLUDED_PATTERNS': ['.d.ts', '.min.js', '.log', 'package-lock.json'],
     # Конкретные имена файлов, которые нужно копировать ВСЕГДА (если они не в исключенной папке/паттерне)
-    'INCLUDE_SPECIFIC_FILES': ['Dockerfile', '.dockerignore', 'docker-compose.yml', 'docker-compose.yaml']
+    'INCLUDE_SPECIFIC_FILES': ['Dockerfile', '.dockerignore', 'docker-compose.yml', 'docker-compose.yaml', 'dockerfile']
 }
 # --------------------
 
-def get_unique_filename(destination_dir: Path, filename: str) -> Path:
+def get_unique_filename(destination_dir: Path, filename: str, add_txt_to_dockerfile: bool = False) -> Path:
+    # Специальная обработка для Dockerfile - добавляем расширение .txt
+    if add_txt_to_dockerfile and filename.lower() == 'dockerfile':
+        filename = 'Dockerfile.txt'
+    
     filepath = destination_dir / filename
 
     if not filepath.exists():
@@ -78,6 +80,19 @@ def should_skip_file(file_path: Path) -> bool:
     except Exception as e:
         print(f"Предупреждение: Не удалось проверить имя файла '{file_path.name}' на исключенные паттерны: {e}")
         return False # На всякий случай не пропускаем
+
+def is_specific_file(file_name: str) -> bool:
+    """
+    Проверяет, входит ли имя файла в список специальных файлов для копирования.
+    Проверка нечувствительна к регистру.
+
+    Args:
+        file_name: Имя файла для проверки.
+
+    Returns:
+        bool: True если файл входит в список спецфайлов.
+    """
+    return any(file_name.lower() == specific_file.lower() for specific_file in CONFIG['INCLUDE_SPECIFIC_FILES'])
 
 def clear_destination():
     """
@@ -203,10 +218,10 @@ def copy_files():
 
             # 2. Проверка на тип файла (расширение или специальное имя)
             is_target_extension = item.suffix.lower() in CONFIG['FILE_EXTENSIONS'] # Сравниваем в нижнем регистре
-            # Сравниваем имя файла целиком
-            is_specific_file = item.name in CONFIG['INCLUDE_SPECIFIC_FILES']
+            # Используем новую функцию для проверки специальных файлов (регистронезависимо)
+            is_specific_file_match = is_specific_file(item.name)
 
-            if not (is_target_extension or is_specific_file):
+            if not (is_target_extension or is_specific_file_match):
                 # Файл не подходит ни по расширению, ни по имени
                 # print(f"Пропуск (не тот тип): {item.relative_to(source_dir)}")
                 stats['skipped_type_mismatch'] += 1
@@ -221,8 +236,12 @@ def copy_files():
             # --- Копирование файла ---
             # Если все проверки пройдены, копируем файл
             try:
+                # Проверяем, является ли файл Dockerfile (регистронезависимо)
+                is_dockerfile = item.name.lower() == 'dockerfile'
+                
                 # Получаем уникальное имя файла для папки назначения
-                dest_file = get_unique_filename(dest_dir, item.name)
+                # Передаем флаг, нужно ли добавить .txt к Dockerfile
+                dest_file = get_unique_filename(dest_dir, item.name, add_txt_to_dockerfile=is_dockerfile)
 
                 # Копируем файл, сохраняя метаданные (например, время модификации)
                 shutil.copy2(item, dest_file) # copy2 сохраняет метаданные
