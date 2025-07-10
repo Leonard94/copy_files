@@ -7,9 +7,12 @@ import os  # Добавлен для обработки ошибок досту�
 
 # --- Константы для путей ---
 # Папка, откуда копируем файлы (используйте необработанные строки r'' или двойные слеши \\ для Windows)
-SOURCE_DIRECTORY = Path('./backend')
+SOURCE_DIRECTORY = Path('./frontend')
 # Папка, куда копируем файлы
-DESTINATION_DIRECTORY = Path('./delete_backend')
+DESTINATION_DIRECTORY = Path('./delete_frontend')
+
+# Флаг для переименования SCSS файлов в CSS
+RENAME_SCSS_TO_CSS = True  # Установите False, если не нужно переименовывать
 # -------------------------
 
 # --- Конфигурация ---
@@ -29,6 +32,11 @@ def get_unique_filename(destination_dir: Path, filename: str, add_txt_to_dockerf
     # Специальная обработка для Dockerfile - добавляем расширение .txt
     if add_txt_to_dockerfile and filename.lower() == 'dockerfile':
         filename = 'Dockerfile.txt'
+    
+    # НОВОЕ: Переименование SCSS файлов в CSS
+    if RENAME_SCSS_TO_CSS and filename.lower().endswith('.scss'):
+        # Заменяем расширение .scss на .css
+        filename = filename[:-5] + '.css'  # Убираем последние 5 символов (.scss) и добавляем .css
     
     filepath = destination_dir / filename
 
@@ -163,6 +171,8 @@ def copy_files():
     print(f"Специфичные файлы для копирования: {CONFIG['INCLUDE_SPECIFIC_FILES']}")
     print(f"Исключаемые директории (по имени): {CONFIG['EXCLUDED_DIRS']}")
     print(f"Исключаемые паттерны в именах файлов: {CONFIG['EXCLUDED_PATTERNS']}")
+    # НОВОЕ: Выводим статус переименования SCSS
+    print(f"Переименование SCSS в CSS: {'Включено' if RENAME_SCSS_TO_CSS else 'Выключено'}")
 
     # --- Инициализация статистики ---
     stats = {
